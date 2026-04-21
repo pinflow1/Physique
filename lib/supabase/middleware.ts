@@ -28,6 +28,13 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
+
+  // NEVER block the callback route — it needs to run freely to exchange tokens
+  if (pathname.startsWith('/auth/callback')) {
+    return supabaseResponse
+  }
+
+  // Protected routes — redirect to auth if not logged in
   const protectedPaths = ['/dashboard', '/upload', '/results']
   const isProtected = protectedPaths.some(p => pathname.startsWith(p))
 
@@ -38,9 +45,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Already logged in — redirect away from /auth to dashboard
   if (user && pathname === '/auth') {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/dashboard'
+    redirectUrl.searchParams.delete('redirectTo')
     return NextResponse.redirect(redirectUrl)
   }
 
