@@ -10,41 +10,49 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
-  // Handle errors from Supabase
+  // Surface Supabase errors back to the auth page
   if (error) {
     console.error('Auth callback error:', error, errorDescription)
-    return NextResponse.redirect(`${origin}/auth?error=${encodeURIComponent(error)}`)
+    return NextResponse.redirect(
+      `${origin}/auth?error=${encodeURIComponent(errorDescription ?? error)}`
+    )
   }
 
   const supabase = await createClient()
 
-  // Handle email confirmation via token_hash (from email template)
+  // --- PATH 1: Email confirmation (token_hash + type) ---
+  // This is what Supabase sends when user clicks the confirmation email link
   if (token_hash && type) {
     const { error: verifyError } = await supabase.auth.verifyOtp({
       token_hash,
-      type: type as any,
+      type: type as 'email' | 'recovery' | 'invite' | 'email_change',
     })
 
     if (verifyError) {
-      console.error('OTP verify error:', verifyError)
-      return NextResponse.redirect(`${origin}/auth?error=verification_failed`)
+      console.error('OTP verify error:', verifyError.message)
+      return NextResponse.redirect(
+        `${origin}/auth?error=${encodeURIComponent(verifyError.message)}`
+      )
     }
 
+    // Verified — go straight to dashboard
     return NextResponse.redirect(`${origin}/dashboard`)
   }
 
-  // Handle OAuth code exchange (Google, GitHub etc)
+  // --- PATH 2: OAuth code exchange (Google, GitHub, magic link) ---
   if (code) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (exchangeError) {
-      console.error('Code exchange error:', exchangeError)
-      return NextResponse.redirect(`${origin}/auth?error=exchange_failed`)
+      console.error('Code exchange error:', exchangeError.message)
+      return NextResponse.redirect(
+        `${origin}/auth?error=${encodeURIComponent(exchangeError.message)}`
+      )
     }
 
     return NextResponse.redirect(`${origin}/dashboard`)
   }
 
-  // Nothing matched — send to auth
-  return NextResponse.redirect(`${origin}/auth`)
+  // Nothing matched — send back to auth with a clear message
+  return NextResponse.redirect(`${origin}/auth?error=Invalid+or+expired+link`)
 }
