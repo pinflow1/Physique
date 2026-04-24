@@ -8,371 +8,201 @@ export default async function ResultsPage({ params }: { params: { id: string } }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth?redirectTo=/results/' + params.id)
 
-  // Validate UUID format to prevent injection
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   if (!uuidRegex.test(params.id)) notFound()
 
   const { data: scan, error } = await supabase
-    .from('scans')
-    .select('*')
-    .eq('id', params.id)
-    .eq('user_id', user.id) // RLS + explicit filter — user can only see their own scans
-    .single()
+    .from('scans').select('*').eq('id', params.id).eq('user_id', user.id).single()
 
   if (error || !scan) notFound()
 
-  if (scan.status === 'failed') {
-    return (
-      <div
-        className="min-h-screen bg-[#0d0d14] flex items-center justify-center px-4"
-        style={{ fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif" }}
-      >
-        <div className="text-center max-w-sm">
-          <div className="text-3xl mb-4">❌</div>
-          <p className="text-[#f0f0ff] font-bold mb-2">Analysis failed</p>
-          <p className="text-[#9494b8] text-sm mb-6">
-            Something went wrong with the AI analysis. Your credits were not deducted.
-          </p>
-          <Link
-            href="/upload"
-            className="inline-flex items-center gap-2 text-white font-bold px-6 py-3 rounded-xl"
-            style={{ background: 'linear-gradient(135deg,#a882ff,#6eb3ff)' }}
-          >
-            Try again
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (scan.status === 'processing') {
-    return (
-      <div
-        className="min-h-screen bg-[#0d0d14] flex items-center justify-center px-4"
-        style={{ fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif" }}
-      >
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/10 border-t-[#a882ff] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#9494b8]">Your analysis is still processing…</p>
-          <p className="text-[#55556e] text-sm mt-1">This usually takes 20–40 seconds</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (scan.status !== 'complete' || !scan.result) {
-    redirect('/dashboard')
-  }
-
-  const r = scan.result as AnalysisResult
-
-  // Validate result shape before rendering to avoid runtime crashes
-  if (!r.summary || !r.muscle_analysis || !r.workout_plan || !r.diet_plan) {
-    return (
-      <div className="min-h-screen bg-[#0d0d14] flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">Result data is incomplete. Please contact support.</p>
-          <Link href="/dashboard" className="text-[#a882ff] hover:underline">← Dashboard</Link>
-        </div>
-      </div>
-    )
-  }
-
-  const tag = (color: string, icon: string, label: string) => (
-    <p
-      className="text-[.63rem] font-bold tracking-[.1em] uppercase flex items-center gap-1.5 mb-3"
-      style={{ color }}
-    >
-      {icon} {label}
-    </p>
+  if (scan.status === 'failed') return (
+    <Wrap><div style={{ textAlign: 'center', padding: '60px 20px' }}>
+      <div style={{ fontSize: '2.5rem', marginBottom: '16px' }}>❌</div>
+      <p style={{ fontWeight: 600, marginBottom: '8px' }}>Analysis failed</p>
+      <p style={{ fontSize: '0.82rem', color: 'var(--text-3)', marginBottom: '24px' }}>Your credits were not deducted.</p>
+      <Link href="/upload" className="btn-gloss btn-primary" style={{ textDecoration: 'none' }}>Try again</Link>
+    </div></Wrap>
   )
 
-  return (
-    <div
-      className="min-h-screen bg-[#0d0d14] text-[#f0f0ff]"
-      style={{ fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif" }}
-    >
-      {/* Sticky sub-nav */}
-      <div
-        className="sticky top-0 z-50 flex items-center justify-between px-5 py-2.5 border-b border-white/[0.08]"
-        style={{ background: 'rgba(13,13,20,0.9)', backdropFilter: 'blur(20px)' }}
-      >
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-1.5 text-[.77rem] font-semibold text-[#9494b8] bg-white/[0.08] border border-white/[0.08] px-3.5 py-1.5 rounded-[10px] hover:text-white transition-colors"
-        >
-          ← Dashboard
-        </Link>
-        <Link
-          href="/upload"
-          className="text-white text-[.74rem] font-bold px-3.5 py-1.5 rounded-[10px]"
-          style={{ background: 'linear-gradient(135deg,#a882ff,#6eb3ff)' }}
-        >
-          📷 New scan
-        </Link>
-      </div>
+  if (scan.status === 'processing') return (
+    <Wrap><div style={{ textAlign: 'center', padding: '60px 20px' }}>
+      <div style={{ width: '40px', height: '40px', border: '2px solid var(--border-2)', borderTopColor: 'var(--text)', borderRadius: '50%', margin: '0 auto 16px', animation: 'spin 0.6s linear infinite' }} />
+      <p style={{ color: 'var(--text-3)', fontSize: '0.87rem' }}>Analysis in progress…</p>
+      <p style={{ fontSize: '0.75rem', color: 'var(--text-4)', marginTop: '6px' }}>Usually takes 20–40 seconds</p>
+    </div></Wrap>
+  )
 
-      <div className="max-w-[540px] mx-auto px-5 py-5 pb-12 space-y-3">
+  if (scan.status !== 'complete' || !scan.result) redirect('/dashboard')
+
+  const r = scan.result as AnalysisResult
+  if (!r.summary || !r.muscle_analysis || !r.workout_plan || !r.diet_plan) redirect('/dashboard')
+
+  return (
+    <Wrap>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
         {/* Summary */}
-        <div className="bg-[#1c1c2e] border border-white/[0.08] rounded-[20px] p-5 shadow-lg">
-          {tag('#a882ff', '🧠', 'AI Summary')}
-          <p className="text-[.83rem] text-[#9494b8] leading-relaxed mb-3">{r.summary}</p>
-          <span
-            className="inline-flex items-center gap-1.5 text-[.71rem] px-3 py-1.5 rounded-lg"
-            style={{
-              background: 'rgba(245,158,11,0.08)',
-              border: '1px solid rgba(245,158,11,0.2)',
-              color: '#f59e0b',
-            }}
-          >
-            ⚠️ {r.body_fat_estimate}
-          </span>
-        </div>
+        <Block label="🧠 AI Summary">
+          <p style={{ fontSize: '0.83rem', color: 'var(--text-2)', lineHeight: 1.65, marginBottom: '12px' }}>{r.summary}</p>
+          <Tag>⚠️ {r.body_fat_estimate}</Tag>
+        </Block>
 
-        {/* Priority Focus */}
-        <div className="bg-[#1c1c2e] border border-white/[0.08] rounded-[20px] p-5 shadow-lg">
-          {tag('#6eb3ff', '🎯', 'Priority Focus Areas')}
-          <div className="space-y-2">
+        {/* Priority */}
+        <Block label="🎯 Priority Focus Areas">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
             {r.priority_focus.map((item, i) => (
-              <div
-                key={i}
-                className="flex items-start gap-2.5 p-2.5 rounded-xl border border-white/[0.08]"
-                style={{ background: 'rgba(255,255,255,0.05)' }}
-              >
-                <span
-                  className="text-[.68rem] font-bold font-mono w-[18px] flex-shrink-0 mt-0.5"
-                  style={{ color: '#a882ff' }}
-                >
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="text-[.8rem] leading-relaxed">{item}</span>
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--card-3)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, fontFamily: 'DM Mono,monospace', color: 'var(--text-3)', width: '18px', flexShrink: 0, marginTop: '2px' }}>{String(i + 1).padStart(2, '0')}</span>
+                <span style={{ fontSize: '0.8rem', lineHeight: 1.5 }}>{item}</span>
               </div>
             ))}
           </div>
-        </div>
+        </Block>
 
         {/* Muscle Analysis */}
-        <div className="bg-[#1c1c2e] border border-white/[0.08] rounded-[20px] p-5 shadow-lg">
-          {tag('#a882ff', '📊', 'Muscle Group Analysis')}
-          {Object.entries(r.muscle_analysis)
-            .filter(([k]) => k !== 'overall_impression')
-            .map(([muscle, text]) => (
-              <div key={muscle} className="border-b border-white/[0.08] py-3 last:border-0">
-                <p className="text-[.64rem] text-[#55556e] uppercase tracking-wider mb-1 capitalize">
-                  {muscle.replace('_', ' ')}
-                </p>
-                <p className="text-[.79rem] text-[#9494b8] leading-relaxed">{text as string}</p>
-              </div>
-            ))}
+        <Block label="📊 Muscle Group Analysis">
+          {Object.entries(r.muscle_analysis).filter(([k]) => k !== 'overall_impression').map(([muscle, text]) => (
+            <div key={muscle} style={{ borderBottom: '1px solid var(--border)', padding: '10px 0' }}>
+              <p style={{ fontSize: '0.62rem', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px', textTransform: 'capitalize' as any }}>{muscle.replace('_', ' ')}</p>
+              <p style={{ fontSize: '0.79rem', color: 'var(--text-2)', lineHeight: 1.5 }}>{text as string}</p>
+            </div>
+          ))}
           {r.muscle_analysis.overall_impression && (
-            <div className="mt-2.5 bg-white/[0.05] rounded-xl p-3">
-              <p className="text-[.63rem] text-[#55556e] mb-1">Overall</p>
-              <p className="text-[.79rem] text-[#9494b8]">{r.muscle_analysis.overall_impression}</p>
+            <div style={{ marginTop: '10px', background: 'var(--card-3)', borderRadius: '10px', padding: '10px 12px' }}>
+              <p style={{ fontSize: '0.61rem', color: 'var(--text-4)', marginBottom: '3px' }}>Overall</p>
+              <p style={{ fontSize: '0.79rem', color: 'var(--text-2)' }}>{r.muscle_analysis.overall_impression}</p>
             </div>
           )}
-        </div>
+        </Block>
 
         {/* Workout Plan */}
-        <div className="bg-[#1c1c2e] border border-white/[0.08] rounded-[20px] p-5 shadow-lg">
-          {tag('#6eb3ff', '🏋️', 'Your Workout Plan')}
-          <div className="space-y-2">
+        <Block label="🏋️ Your Workout Plan">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {r.workout_plan.map(day => (
-              <div
-                key={day.day}
-                className="bg-white/[0.05] border border-white/[0.08] rounded-[14px] p-3.5"
-              >
-                <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[.83rem] font-bold">{day.day}</span>
-                  <span
-                    className="text-[.62rem] font-bold text-white px-2 py-1 rounded-full"
-                    style={{ background: 'linear-gradient(135deg,#a882ff,#6eb3ff)' }}
-                  >
-                    {day.focus}
-                  </span>
+              <div key={day.day} style={{ background: 'var(--card-3)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 700 }}>{day.day}</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, background: 'var(--accent)', color: 'var(--accent-fg)', padding: '3px 9px', borderRadius: '999px' }}>{day.focus}</span>
                 </div>
-                <div className="space-y-1.5">
-                  {day.exercises.map((ex, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start justify-between gap-2 py-1.5 border-b border-white/[0.06] last:border-0"
-                    >
-                      <div>
-                        <p className="text-[.77rem]">{ex.name}</p>
-                        {ex.notes && (
-                          <p className="text-[.65rem] text-[#55556e] mt-0.5">{ex.notes}</p>
-                        )}
-                      </div>
-                      <span className="text-[.69rem] font-mono text-[#9494b8] flex-shrink-0">
-                        {ex.sets}×{ex.reps}
-                      </span>
+                {day.exercises.map((ex, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', padding: '6px 0', borderBottom: i < day.exercises.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    <div>
+                      <p style={{ fontSize: '0.77rem' }}>{ex.name}</p>
+                      {ex.notes && <p style={{ fontSize: '0.65rem', color: 'var(--text-4)', marginTop: '2px' }}>{ex.notes}</p>}
                     </div>
-                  ))}
-                </div>
+                    <span style={{ fontSize: '0.69rem', fontFamily: 'DM Mono,monospace', color: 'var(--text-3)', flexShrink: 0 }}>{ex.sets}×{ex.reps}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
-        </div>
+        </Block>
 
-        {/* Diet Blueprint */}
-        <div className="bg-[#1c1c2e] border border-white/[0.08] rounded-[20px] p-5 shadow-lg">
-          {tag('#ff85c8', '🥗', 'Diet Blueprint')}
-          <div className="grid grid-cols-4 gap-2 mb-4">
+        {/* Diet */}
+        <Block label="🥗 Diet Blueprint">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '16px' }}>
             {[
               { l: 'Calories', v: r.diet_plan.calories_estimate },
               { l: 'Protein', v: r.diet_plan.protein_target },
               { l: 'Carbs', v: r.diet_plan.carbs_target },
               { l: 'Fats', v: r.diet_plan.fats_target },
             ].map(m => (
-              <div
-                key={m.l}
-                className="bg-white/[0.05] border border-white/[0.08] rounded-xl p-2.5 text-center"
-              >
-                <p className="text-[.6rem] text-[#9494b8] uppercase tracking-wider mb-1">{m.l}</p>
-                <p
-                  className="text-[.68rem] font-bold leading-tight"
-                  style={{
-                    background: 'linear-gradient(135deg,#a882ff,#6eb3ff)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}
-                >
-                  {m.v}
-                </p>
+              <div key={m.l} style={{ background: 'var(--card-3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 6px', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.58rem', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{m.l}</p>
+                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text)' }}>{m.v}</p>
               </div>
             ))}
           </div>
-          <p className="text-[.73rem] text-[#9494b8] mb-3">{r.diet_plan.meal_timing}</p>
-          <div className="grid grid-cols-2 gap-4">
+          {r.diet_plan.meal_timing && <p style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginBottom: '14px' }}>{r.diet_plan.meal_timing}</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
-              <p
-                className="text-[.63rem] font-bold uppercase tracking-wider mb-2"
-                style={{ color: '#a882ff' }}
-              >
-                ✦ Prioritize
-              </p>
+              <p style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-2)', marginBottom: '8px' }}>✦ Prioritize</p>
               {r.diet_plan.foods_to_prioritize.map((f, i) => (
-                <p
-                  key={i}
-                  className="flex items-start gap-1.5 text-[.77rem] text-[#9494b8] mb-1.5"
-                >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
-                    style={{ background: '#a882ff' }}
-                  />
-                  {f}
+                <p key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.77rem', color: 'var(--text-3)', marginBottom: '6px' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--text)', flexShrink: 0, marginTop: '5px' }} />{f}
                 </p>
               ))}
             </div>
             <div>
-              <p className="text-[.63rem] font-bold uppercase tracking-wider mb-2 text-[#55556e]">
-                ✦ Limit
-              </p>
+              <p style={{ fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-4)', marginBottom: '8px' }}>✦ Limit</p>
               {r.diet_plan.foods_to_limit.map((f, i) => (
-                <p
-                  key={i}
-                  className="flex items-start gap-1.5 text-[.77rem] text-[#9494b8] mb-1.5"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 bg-[#55556e]" />
-                  {f}
+                <p key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.77rem', color: 'var(--text-3)', marginBottom: '6px' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--text-4)', flexShrink: 0, marginTop: '5px' }} />{f}
                 </p>
               ))}
             </div>
           </div>
-          {r.diet_plan.supplements && r.diet_plan.supplements.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/[0.08]">
-              <p className="text-[.63rem] font-bold uppercase tracking-wider mb-2 text-[#9494b8]">
-                Supplements
-              </p>
-              {r.diet_plan.supplements.map((s, i) => (
-                <p key={i} className="text-[.77rem] text-[#9494b8] mb-1.5">
-                  · {s}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
+        </Block>
 
-        {/* Gap Analysis (comparison only) */}
+        {/* Gap Analysis */}
         {r.gap_analysis && (
-          <div
-            className="rounded-[20px] p-5"
-            style={{
-              background: 'linear-gradient(145deg,rgba(168,130,255,.07),rgba(110,179,255,.05))',
-              border: '1px solid rgba(168,130,255,.2)',
-            }}
-          >
-            {tag('#a882ff', '📈', 'Gap Analysis')}
-            <div className="grid grid-cols-2 gap-2.5 mb-4">
-              {[
-                { l: 'Current State', t: r.gap_analysis.current_state },
-                { l: 'Goal State', t: r.gap_analysis.goal_state },
-              ].map(s => (
-                <div
-                  key={s.l}
-                  className="bg-white/[0.05] border border-white/[0.08] rounded-xl p-3"
-                >
-                  <p className="text-[.63rem] text-[#55556e] uppercase tracking-wider mb-1.5">
-                    {s.l}
-                  </p>
-                  <p className="text-[.77rem] text-[#9494b8] leading-relaxed">{s.t}</p>
+          <Block label="📈 Gap Analysis">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+              {[{ l: 'Current State', t: r.gap_analysis.current_state }, { l: 'Goal State', t: r.gap_analysis.goal_state }].map(s => (
+                <div key={s.l} style={{ background: 'var(--card-3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px' }}>
+                  <p style={{ fontSize: '0.61rem', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>{s.l}</p>
+                  <p style={{ fontSize: '0.77rem', color: 'var(--text-2)', lineHeight: 1.5 }}>{s.t}</p>
                 </div>
               ))}
             </div>
-            <p className="text-[.63rem] text-[#55556e] uppercase tracking-wider mb-2.5">
-              Key Milestones
-            </p>
+            <p style={{ fontSize: '0.61rem', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Key Milestones</p>
             {r.gap_analysis.key_milestones.map((m, i) => (
-              <div key={i} className="flex gap-2 mb-1.5 text-[.77rem] text-[#9494b8]">
-                <span style={{ color: '#a882ff' }}>→</span>
-                {m}
+              <div key={i} style={{ display: 'flex', gap: '8px', fontSize: '0.77rem', color: 'var(--text-3)', marginBottom: '6px' }}>
+                <span style={{ color: 'var(--text)' }}>→</span>{m}
               </div>
             ))}
-            <div
-              className="mt-3 rounded-xl p-3"
-              style={{
-                background: 'linear-gradient(135deg,rgba(168,130,255,.1),rgba(110,179,255,.07))',
-                border: '1px solid rgba(168,130,255,.2)',
-              }}
-            >
-              <p className="text-[.63rem] font-bold mb-1" style={{ color: '#a882ff' }}>
-                ⏱ Realistic Timeline
-              </p>
-              <p className="text-[.79rem] text-[#9494b8]">
-                {r.gap_analysis.realistic_timeline}
-              </p>
+            <div style={{ marginTop: '12px', background: 'var(--card-3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+              <p style={{ fontSize: '0.61rem', fontWeight: 700, marginBottom: '4px', color: 'var(--text-2)' }}>⏱ Realistic Timeline</p>
+              <p style={{ fontSize: '0.79rem', color: 'var(--text-3)' }}>{r.gap_analysis.realistic_timeline}</p>
             </div>
-          </div>
+          </Block>
         )}
 
         {/* Timeline */}
-        <div className="bg-[#1c1c2e] border border-white/[0.08] rounded-[20px] p-5 shadow-lg">
-          {tag('#a882ff', '⏱', 'Timeline')}
-          <p className="text-[.83rem] text-[#9494b8]">{r.timeline}</p>
-        </div>
+        <Block label="⏱ Timeline">
+          <p style={{ fontSize: '0.83rem', color: 'var(--text-2)' }}>{r.timeline}</p>
+        </Block>
 
         {/* Disclaimer */}
-        <div
-          className="rounded-[14px] p-4 flex gap-2.5 text-[.72rem] text-[#9494b8] leading-relaxed"
-          style={{
-            background: 'rgba(245,158,11,0.07)',
-            border: '1px solid rgba(245,158,11,0.2)',
-          }}
-        >
-          <span>⚠️</span>
-          <p>{r.disclaimer}</p>
+        <div style={{ background: 'var(--card-2)', border: '1px solid var(--border)', borderRadius: '14px', padding: '14px', display: 'flex', gap: '10px', fontSize: '0.73rem', color: 'var(--text-3)', lineHeight: 1.55 }}>
+          <span>⚠️</span><p>{r.disclaimer}</p>
         </div>
 
-        <div className="text-center pt-2">
-          <Link
-            href="/upload"
-            className="inline-flex items-center gap-2 text-white font-bold px-6 py-3 rounded-xl"
-            style={{ background: 'linear-gradient(135deg,#a882ff,#6eb3ff)' }}
-          >
-            📷 Run another scan
-          </Link>
+        <div style={{ textAlign: 'center', paddingTop: '8px' }}>
+          <Link href="/upload" className="btn-gloss btn-primary" style={{ textDecoration: 'none' }}>📷 Run another scan</Link>
         </div>
       </div>
+    </Wrap>
+  )
+}
+
+function Wrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: "'DM Sans',system-ui,sans-serif" }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', backdropFilter: 'blur(20px)' }}>
+        <Link href="/dashboard" style={{ fontSize: '0.77rem', fontWeight: 600, color: 'var(--text-3)', textDecoration: 'none', background: 'var(--card-3)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '10px' }}>← Dashboard</Link>
+        <Link href="/upload" className="btn-gloss btn-primary" style={{ textDecoration: 'none', fontSize: '0.76rem', padding: '7px 14px', borderRadius: '10px' }}>📷 New scan</Link>
+      </div>
+      <div style={{ maxWidth: '540px', margin: '0 auto', padding: '16px 20px 48px' }}>{children}</div>
     </div>
   )
 }
+
+function Block({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '18px', padding: '18px', boxShadow: 'var(--shadow-sm)' }}>
+      <p style={{ fontSize: '0.61rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: '12px' }}>{label}</p>
+      {children}
+    </div>
+  )
+}
+
+function Tag({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.71rem', padding: '5px 10px', borderRadius: '8px', background: 'var(--card-3)', border: '1px solid var(--border)', color: 'var(--text-3)' }}>
+      {children}
+    </span>
+  )
+                                                                          }
+        
