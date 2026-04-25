@@ -64,7 +64,7 @@ export default async function ResultsPage({ params }: { params: { id: string } }
         <Block label="📊 Muscle Group Analysis">
           {Object.entries(r.muscle_analysis).filter(([k]) => k !== 'overall_impression').map(([muscle, text]) => (
             <div key={muscle} style={{ borderBottom: '1px solid var(--border)', padding: '10px 0' }}>
-              <p style={{ fontSize: '0.62rem', color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '3px', textTransform: 'capitalize' as any }}>{muscle.replace('_', ' ')}</p>
+              <p style={{ fontSize: '0.62rem', color: 'var(--text-4)', textTransform: 'capitalize' as any, letterSpacing: '0.07em', marginBottom: '3px' }}>{muscle.replace('_', ' ')}</p>
               <p style={{ fontSize: '0.79rem', color: 'var(--text-2)', lineHeight: 1.5 }}>{text as string}</p>
             </div>
           ))}
