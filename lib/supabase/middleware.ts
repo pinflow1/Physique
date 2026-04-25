@@ -28,23 +28,19 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  // Never intercept the callback — it needs to run freely to exchange tokens
-  if (pathname.startsWith('/auth/callback')) {
+  // Never block auth routes — they handle their own logic
+  if (
+    pathname.startsWith('/auth/callback') ||
+    pathname.startsWith('/auth/confirm') ||
+    pathname.startsWith('/auth/signout')
+  ) {
     return supabaseResponse
   }
 
-  // Known public routes — always allow
-  const publicRoutes = ['/', '/auth', '/pricing', '/privacy']
-  const isPublic = publicRoutes.some(r => pathname === r || pathname.startsWith(r))
-
-  // Known app routes — require auth
-  const protectedRoutes = ['/dashboard', '/upload', '/results']
+  // Protected — require login
+  const protectedRoutes = ['/dashboard', '/upload', '/results', '/settings']
   const isProtected = protectedRoutes.some(r => pathname.startsWith(r))
 
-  // Known API routes — let them handle their own auth
-  const isApi = pathname.startsWith('/api/')
-
-  // If protected and not logged in → send to sign in
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth'
@@ -52,18 +48,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // If already logged in and hitting /auth → send to dashboard
-  if (user && pathname === '/auth') {
+  // Don't auto-redirect /auth — let the page handle tab=signup etc
+  // Only redirect if user hits plain /auth with no tab param
+  if (user && pathname === '/auth' && !request.nextUrl.searchParams.get('tab')) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
-    url.searchParams.delete('redirectTo')
-    return NextResponse.redirect(url)
-  }
-
-  // Unknown route that isn't public or API → redirect to sign in instead of 404
-  if (!isPublic && !isProtected && !isApi) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth'
     return NextResponse.redirect(url)
   }
 
